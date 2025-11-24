@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Elements } from '@recurly/react-recurly';
@@ -6,16 +5,14 @@ import type { Plan, Subscription } from '../types/subscription';
 import { subscriptionService } from '../services/subscriptionService';
 import SubscribeForm from '../components/SubscribeForm';
 import SubscriptionDetails from '../components/SubscriptionDetails';
-import UpdatePlanForm from '../components/UpdatePlanForm';
 
 export default function Dashboard() {
     const navigate = useNavigate();
-    const [subscription, setSubscription] = useState<Subscription | null>(null);
+    const [subscriptions, setSubscriptions] = useState<Subscription[] | null>(null);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showSubscribeForm, setShowSubscribeForm] = useState(false);
-    const [isUpdating, setIsUpdating] = useState(false);
 
     const token = localStorage.getItem('token');
 
@@ -33,7 +30,7 @@ export default function Dashboard() {
                 subscriptionService.getSubscriptions(),
                 subscriptionService.getPlans()
             ]);
-            setSubscription(subscriptionData);
+            setSubscriptions(subscriptionData);
             setPlans(plansData);
         } catch (err: any) {
             setError(err.message);
@@ -50,30 +47,28 @@ export default function Dashboard() {
 
     const handleSubscribeSuccess = async () => {
         const data = await subscriptionService.getSubscriptions();
-        setSubscription(data);
+        setSubscriptions(data);
         setShowSubscribeForm(false);
     };
 
-    const handleUpdateSubmit = async (planCode: string) => {
-        if (!subscription) return;
-
+    const handleUpdateSubmit = async (subscriptionId: string, planCode: string) => {
         try {
-            const data = await subscriptionService.updateSubscription(subscription.id, planCode);
-            setSubscription({ ...subscription, plan_code: data.newPlan });
-            setIsUpdating(false);
+            await subscriptionService.updateSubscription(subscriptionId, planCode);
+            const updatedSubscriptions = await subscriptionService.getSubscriptions();
+            setSubscriptions(updatedSubscriptions);
             alert('Plan updated successfully!');
         } catch (err: any) {
             setError(err.message);
         }
     };
 
-    const handleCancel = async () => {
-        if (!subscription) return;
+    const handleCancel = async (subscriptionId: string) => {
         if (!window.confirm('Are you sure you want to cancel your subscription?')) return;
 
         try {
-            await subscriptionService.cancelSubscription(subscription.id);
-            setSubscription(null);
+            await subscriptionService.cancelSubscription(subscriptionId);
+            const updatedSubscriptions = await subscriptionService.getSubscriptions();
+            setSubscriptions(updatedSubscriptions);
             alert('Subscription canceled.');
         } catch (err: any) {
             setError(err.message);
@@ -81,6 +76,8 @@ export default function Dashboard() {
     };
 
     if (loading) return <div className="app-container">Loading...</div>;
+
+    const hasSubscriptions = subscriptions && subscriptions.length > 0;
 
     return (
         <div>
@@ -105,15 +102,20 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {!subscription && !showSubscribeForm && (
+            {!hasSubscriptions && (
                 <div className="card">
                     <h2>No Active Subscription</h2>
                     <p>You are not currently subscribed to any plan.</p>
+                </div>
+            )}
+
+            {!showSubscribeForm && (
+                <div className ="card">
                     <button onClick={() => setShowSubscribeForm(true)}>Add Subscription</button>
                 </div>
             )}
 
-            {!subscription && showSubscribeForm && (
+            { showSubscribeForm && (
                 <Elements>
                     <SubscribeForm
                         plans={plans}
@@ -123,24 +125,13 @@ export default function Dashboard() {
                 </Elements>
             )}
 
-            {subscription && (
-                <div className="card">
-                    {isUpdating ? (
-                        <UpdatePlanForm
-                            plans={plans}
-                            currentPlanCode={subscription.plan.code}
-                            onSubmit={handleUpdateSubmit}
-                            onCancel={() => setIsUpdating(false)}
-                        />
-                    ) : (
-                        <SubscriptionDetails
-                            subscription={subscription}
-                            plans={plans}
-                            onUpdate={() => setIsUpdating(true)}
-                            onCancel={handleCancel}
-                        />
-                    )}
-                </div>
+            {hasSubscriptions && (
+                <SubscriptionDetails
+                    subscriptions={subscriptions}
+                    plans={plans}
+                    onUpdate={handleUpdateSubmit}
+                    onCancel={handleCancel}
+                />
             )}
         </div>
     );

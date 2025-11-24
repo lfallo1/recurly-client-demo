@@ -46,8 +46,8 @@ export const subscriptionService = {
     },
 
     async cancelSubscription(subscriptionId: string) {
-        const res = await fetch(`${API_BASE}/subscriptions/${subscriptionId}`, {
-            method: 'DELETE',
+        const res = await fetch(`${API_BASE}/subscriptions/${subscriptionId}/cancel`, {
+            method: 'PUT',
             headers: getAuthHeaders()
         });
         if (!res.ok) throw new Error('Cancellation failed');
